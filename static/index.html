@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Parking</title>
+</head>
+<body>
+    <h1>Welcome to Smart Parking</h1>
+    <p>Check available slots below:</p>
+    <div id="slots"></div>
+    <script>
+        async function fetchSlots() {
+            const res = await fetch('/slots/vacant');
+            const slots = await res.json();
+            document.getElementById('slots').innerHTML = JSON.stringify(slots, null, 2);
+        }
+        fetchSlots();
+    </script>
+</body>
+</html>
