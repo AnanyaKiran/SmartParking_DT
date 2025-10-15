@@ -5,6 +5,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from database import get_slot_by_id, free_slot  # example functions
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
+import uvicorn
 
 
 # Initialize app
@@ -13,8 +16,21 @@ app = FastAPI(title="Smart Parking Management System")
 # Create database tables if they don't exist
 create_tables()
 
-# Mount your static files directory
+# Mount static folder (CSS, JS, etc.)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Setup templates (for HTML pages)
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    """Default page that appears when app opens."""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# Optional: free slot route (if you want to open free_slot.html)
+@app.get("/free_slot", response_class=HTMLResponse)
+async def free_slot_page(request: Request):
+    return templates.TemplateResponse("free_slot.html", {"request": request})
 
 # Serve index.html when someone visits the root URL
 @app.get("/")

@@ -1,39 +1,48 @@
-import sqlite3
+from database import get_db_connection
 
 def create_tables():
-    conn = sqlite3.connect("parking.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Users table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id SERIAL PRIMARY KEY,
         name TEXT,
         phone TEXT,
         email TEXT
-    )""")
+    )
+    """)
 
+    # Slots table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS slots (
-        slot_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        is_occupied BOOLEAN DEFAULT 0,
-        vehicle_id INTEGER
-    )""")
+        slot_id SERIAL PRIMARY KEY,
+        is_occupied BOOLEAN DEFAULT FALSE,
+        vehicle_id INT
+    )
+    """)
 
+    # Vehicles table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS vehicles (
-        vehicle_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_id SERIAL PRIMARY KEY,
         license_plate TEXT,
-        user_id INTEGER,
-        parked_slot INTEGER,
+        user_id INT,
+        parked_slot INT,
         vehicle_type TEXT,
-        entry_time DATETIME
-    )""")
+        phone_number TEXT,
+        entry_time TIMESTAMP
+    )
+    """)
 
+    # Optional: Pre-populate 10 slots for demo
     cursor.execute("SELECT COUNT(*) FROM slots")
     count = cursor.fetchone()[0]
     if count == 0:
-        for i in range(1, 11):
-            cursor.execute("INSERT INTO slots (is_occupied, vehicle_id) VALUES (0, NULL)")
+        for _ in range(10):
+            cursor.execute("INSERT INTO slots (is_occupied, vehicle_id) VALUES (FALSE, NULL)")
 
     conn.commit()
+    cursor.close()
     conn.close()
