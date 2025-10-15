@@ -13,15 +13,15 @@ client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 def send_sms_notification(to_number: str, slot_id: int, vehicle_type: str, vehicle_id: int):
     """
-    Sends SMS to user with slot details and link to free the slot.
+    Sends SMS to user with a clickable link to free the slot.
     """
-    # Direct link that allows the user to free their slot
-    slot_link = f"https://your-vercel-app.vercel.app/slots/free_by_user/{vehicle_id}"
+    # Link points to the Vercel frontend
+    slot_link = f"https://your-frontend.vercel.app/free_slot.html?vehicle_id={vehicle_id}"
 
     message_body = (
         f"🚗 Smart Parking Alert 🚗\n\n"
         f"Your {vehicle_type} has been parked in Slot {slot_id}.\n"
-        f"When you leave, click below to free your slot:\n{slot_link}\n\n"
+        f"Click here to free your slot when leaving:\n{slot_link}\n\n"
         f"Thank you for using Smart Parking!"
     )
 
@@ -30,5 +30,5 @@ def send_sms_notification(to_number: str, slot_id: int, vehicle_type: str, vehic
         from_=TWILIO_PHONE_NUMBER,
         to=to_number
     )
-
     print(f"✅ SMS sent to {to_number}: {message.sid}")
+
