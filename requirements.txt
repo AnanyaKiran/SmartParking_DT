@@ -3,4 +3,5 @@ uvicorn
 python-dotenv
 twilio
 psycopg2-binary
-
+jinja2
+requests
