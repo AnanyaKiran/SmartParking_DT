@@ -1,0 +1,42 @@
+<!-- templates/slot_details.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot {{ slot.slot_id }} Details</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h2>🚗 Parking Slot {{ slot.slot_id }} Details</h2>
+
+    <div class="slot-info">
+        <p><strong>Status:</strong> 
+            {% if slot.is_occupied %}
+                <span class="occupied">Occupied</span>
+            {% else %}
+                <span class="free">Free</span>
+            {% endif %}
+        </p>
+
+        <p><strong>Vehicle ID:</strong> 
+            {% if slot.vehicle_id %}
+                {{ slot.vehicle_id }}
+            {% else %}
+                N/A
+            {% endif %}
+        </p>
+    </div>
+
+    {% if slot.is_occupied %}
+    <form action="/slots/free/{{ slot.slot_id }}" method="post">
+        <button type="submit" class="free-btn">🅿️ Free This Slot</button>
+    </form>
+    {% else %}
+    <p class="info">This slot is already free.</p>
+    {% endif %}
+
+    <a href="/" class="back-link">⬅️ Back to Dashboard</a>
+
+</body>
+</html>

@@ -1,14 +1,17 @@
+/* General styling */
 body {
     font-family: 'Segoe UI', sans-serif;
     background-color: #f5f5f5;
     text-align: center;
     padding: 40px;
+    margin: 0;
 }
 
 h2 {
     color: #2c3e50;
 }
 
+/* Slot container */
 #slot-status {
     margin-top: 30px;
     display: flex;
@@ -17,18 +20,54 @@ h2 {
     gap: 15px;
 }
 
+/* Individual slot card */
 .slot {
     background: white;
     border-radius: 10px;
     padding: 15px;
     width: 180px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.slot:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Slot status indicators */
 .vacant {
     border-left: 5px solid #2ecc71;
 }
 
 .occupied {
     border-left: 5px solid #e74c3c;
+}
+
+/* Links & buttons */
+.slot a {
+    display: inline-block;
+    margin-top: 10px;
+    text-decoration: none;
+    color: #2980b9;
+    font-weight: bold;
+}
+
+.slot a:hover {
+    text-decoration: underline;
+}
+
+button.free-btn {
+    padding: 10px 15px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+button.free-btn:hover {
+    background-color: #c0392b;
 }

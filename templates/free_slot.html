@@ -1,0 +1,22 @@
+<!-- templates/free_slot.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Parking Slot</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h2>🚘 Free Your Parking Slot</h2>
+
+    <div>
+        <p>✅ Slot {{ slot_id }} freed successfully!</p>
+        <p>Vehicle Type: {{ vehicle_type }}</p>
+        <p>Amount Due: ₹{{ amount_due }}</p>
+        <p>Thank you for using Smart Parking!</p>
+    </div>
+
+    <a href="/">Go back to Dashboard</a>
+</body>
+</html>
