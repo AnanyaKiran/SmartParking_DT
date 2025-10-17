@@ -40,24 +40,29 @@ def get_db_connection():
 
 def get_slot_by_id(slot_id: int):
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT slot_id, is_occupied, vehicle_id FROM slots WHERE slot_id = %s;",
-        (slot_id,)
-    )
-    slot = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return slot
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT slot_id, is_occupied, vehicle_id FROM slots WHERE slot_id = %s;",
+                (slot_id,)
+            )
+            slot = cursor.fetchone()
+            return slot
+    finally:
+        conn.close()
+
 
 
 def free_slot(slot_id: int):
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE slots SET is_occupied = FALSE, vehicle_id = NULL WHERE slot_id = %s;",
-        (slot_id,)
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE slots SET is_occupied = FALSE, vehicle_id = NULL WHERE slot_id = %s RETURNING *;",
+                (slot_id,)
+            )
+            conn.commit()
+            return cursor.fetchone()
+    finally:
+        conn.close()
+

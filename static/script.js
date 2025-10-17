@@ -1,4 +1,5 @@
-const backendURL = "https://your-backend-url.onrender.com"; // ⚠️ Change this
+// Use relative URL so it works on Render without hardcoding backendURL
+const backendURL = ""; // Empty string → fetches from same origin
 
 async function fetchSlots() {
     try {
@@ -6,7 +7,7 @@ async function fetchSlots() {
         const slots = await response.json();
 
         const container = document.getElementById("slot-status");
-        container.innerHTML = "";
+        container.innerHTML = ""; // Clear previous content
 
         slots.forEach(slot => {
             const div = document.createElement("div");
@@ -14,7 +15,8 @@ async function fetchSlots() {
             div.innerHTML = `
                 <h4>Slot ${slot.slot_id}</h4>
                 <p>Status: ${slot.is_occupied ? "Occupied" : "Vacant"}</p>
-                ${slot.is_occupied ? `<p>Vehicle ID: ${slot.vehicle_id}</p>` : ""}
+                ${slot.is_occupied ? `<p>Vehicle ID: ${slot.vehicle_id}</p>
+                <a href="/slot/${slot.slot_id}">View Details</a>` : ""}
             `;
             container.appendChild(div);
         });
@@ -24,5 +26,8 @@ async function fetchSlots() {
     }
 }
 
+// Initial fetch
 fetchSlots();
-setInterval(fetchSlots, 5000); // Refresh every 5s
+
+// Auto-refresh every 5 seconds
+setInterval(fetchSlots, 5000);
