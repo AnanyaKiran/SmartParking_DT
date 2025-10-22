@@ -18,11 +18,10 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
 
 def get_db_connection():
-    """Establish connection to PostgreSQL (Render/Railway compatible)."""
     try:
         if DATABASE_URL:
             # Render uses DATABASE_URL format
-            conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+            conn = psycopg2.connect(os.getenv("DATABASE_URL"), cursor_factory=RealDictCursor)
         else:
             conn = psycopg2.connect(
                 dbname=DB_NAME,
@@ -37,6 +36,15 @@ def get_db_connection():
         print("❌ Database connection failed:", e)
         raise
 
+def get_all_slots():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT slot_id, is_occupied, vehicle_id FROM slots ORDER BY slot_id;")
+            slots = cursor.fetchall()
+            return slots
+    finally:
+        conn.close()
 
 def get_slot_by_id(slot_id: int):
     conn = get_db_connection()

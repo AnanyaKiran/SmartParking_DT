@@ -1,4 +1,3 @@
-# notify.py
 import os
 from dotenv import load_dotenv
 from twilio.rest import Client
@@ -9,20 +8,36 @@ load_dotenv()
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
-BASE_URL = os.getenv("BASE_URL")  # Dynamic link
+BASE_URL = os.getenv("BASE_URL")  # Use your Render URL in production
 
 client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-def send_sms_notification(to_number: str, slot_id: int, vehicle_type: str, vehicle_id: int, background_tasks: BackgroundTasks = None):
+
+def send_sms_notification(
+    to_number: str,
+    slot_id: int,
+    vehicle_type: str,
+    vehicle_id: int,
+    user_name: str,
+    background_tasks: BackgroundTasks = None
+):
     """
-    Sends SMS to the user with the slot link.
-    Can run in background if background_tasks is provided.
+    Sends SMS notification after registration with slot details
+    and the link to free the slot later.
     """
     slot_link = f"{BASE_URL}/slots/free_by_user/{vehicle_id}"
+        # Ensure phone number is in E.164 format for India
+    to_number = to_number.strip()
+    if not to_number.startswith("+"):
+        to_number = "+91" + to_number
+
     message_body = (
-        f"🚗 Smart Parking Alert 🚗\n\n"
-        f"Your {vehicle_type} is parked in Slot {slot_id}.\n"
-        f"Click here to free your slot:\n{slot_link}\n\n"
+        f"✅ Smart Parking Confirmation ✅\n\n"
+        f"Hello {user_name}, your {vehicle_type} has been successfully parked.\n"
+        f"🅿️ Slot Number: {slot_id}\n"
+        f"🚘 Vehicle ID: {vehicle_id}\n\n"
+        f"When you leave, click below to free your slot:\n"
+        f"{slot_link}\n\n"
         f"Thank you for using Smart Parking!"
     )
 

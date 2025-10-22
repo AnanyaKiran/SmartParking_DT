@@ -1,4 +1,3 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,7 +19,7 @@
                 container.innerHTML = slots.map(s => `
                     <div>
                         Slot ${s.slot_id}: ${s.is_occupied ? "Occupied" : "Free"} 
-                        ${s.is_occupied ? `<a href="/slot/${s.slot_id}">Details</a>` : ""}
+                        ${s.is_occupied && s.vehicle_id ? `<span>(Vehicle ID: ${s.vehicle_id})</span>` : ""}
                     </div>
                 `).join("");
             } catch (err) {

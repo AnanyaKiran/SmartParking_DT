@@ -1,3 +1,11 @@
 uvicorn main:app --reload
-http://127.0.0.1:8000/docs
-http://127.0.0.1:8000/
+python main.py
+psql postgresql://parking_db_uck6_user:5xrZr12gdpogeOLT3HaSEBJbTe1YBlOU@dpg-d3oc1d2li9vc73c147j0-a.singapore-postgres.render.com/parking_db_uck6
+select * from slots;
+q to quit from More
+\q to quit from database
+http://127.0.0.1:8000/register
+
+UPDATE slots
+SET is_occupied = FALSE,
+    vehicle_id = NULL;

@@ -36,10 +36,26 @@ def create_tables():
     );
     """)
 
-    # 4️⃣ Pre-populate 10 slots if empty
+        # 4️⃣ Free Tokens table for freeing slot via link (Twilio SMS)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS free_tokens (
+        token_uuid UUID PRIMARY KEY,
+        vehicle_id INTEGER REFERENCES vehicles(vehicle_id) ON DELETE CASCADE,
+        slot_id INTEGER REFERENCES slots(slot_id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        used BOOLEAN DEFAULT FALSE
+    );
+    """)
+
+
+    #Pre-populate 10 slots if empty
     cursor.execute("SELECT COUNT(*) FROM slots;")
     result = cursor.fetchone()
-    count = result["count"] if result else 0
+    # Pre-populate 10 slots if table is empty
+    cursor.execute("SELECT COUNT(*) FROM slots;")
+    result = cursor.fetchone()
+    count = result["count"] if result else 0  # use the column name, not index
 
     if count == 0:
         for _ in range(10):
