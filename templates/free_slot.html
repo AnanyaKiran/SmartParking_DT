@@ -10,13 +10,15 @@
 <body>
     <h2>🚘 Free Your Parking Slot</h2>
 
-    <div>
-        <p>✅ Slot {{ slot_id }} freed successfully!</p>
-        <p>Vehicle Type: {{ vehicle_type }}</p>
-        <p>Amount Due: ₹{{ amount_due }}</p>
-        <p>Thank you for using Smart Parking!</p>
-    </div>
+    <div class="card">
+    <h2>🚗 Exit Summary</h2>
+    <p><strong>Vehicle:</strong> {{ license_plate }} {{ vehicle_type }}</p>
+    <p><strong>Slot Freed:</strong> {{ slot_id }}</p>
+    <p><strong>Entry Time:</strong> {{ entry_time }}</p>
+    <p><strong>Exit Time:</strong> {{ exit_time }}</p>
+    <p><strong>Duration:</strong> {{ duration }}</p>
+    <h3>💰 Amount to Pay: ₹{{ amount }}</h3>
 
-    <a href="/">Go back to Dashboard</a>
+    <p>Thank you for using Smart Parking! 👋</p>
 </body>
 </html>

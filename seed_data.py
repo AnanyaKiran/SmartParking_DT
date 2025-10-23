@@ -22,4 +22,3 @@ def seed_database():
     conn.commit()
     cursor.close()
     conn.close()
-    print("✅ Database seeded with 10 empty slots. No users or vehicles added.")

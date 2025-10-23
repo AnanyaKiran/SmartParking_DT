@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .slot-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .slot-box {
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+        .occupied {
+            border-left: 6px solid red;
+        }
+        .free {
+            border-left: 6px solid green;
+        }
+        .slot-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .slot-details {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h2>🚗 Smart Parking Dashboard 🚗</h2>
+    <div id="slot-status">Loading slots...</div>
+
+    <script>
+        async function fetchSlots() {
+            try {
+                const response = await fetch("/slots/");
+                const slots = await response.json();
+
+                const container = document.getElementById("slot-status");
+                container.classList.add("slot-container");
+
+                if (slots.length === 0) {
+                    container.innerHTML = "<p>No slots found.</p>";
+                    return;
+                }
+
+                container.innerHTML = slots.map(s => `
+                    <div class="slot-box ${s.is_occupied ? 'occupied' : 'free'}">
+                        <div class="slot-title">Slot ${s.slot_id}: ${s.is_occupied ? "Occupied" : "Free"}</div>
+                        ${s.is_occupied ? `
+                            <div class="slot-details">
+                                Vehicle ID: ${s.vehicle_id || 'N/A'} <br>
+                                License Plate: ${s.license_plate || 'N/A'} <br>
+                                User Name: ${s.user_name || 'N/A'}
+                            </div>
+                        ` : `
+                            <div class="slot-details">Currently Available</div>
+                        `}
+                    </div>
+                `).join("");
+            } catch (err) {
+                console.error(err);
+                document.getElementById("slot-status").innerHTML = "⚠️ Error loading slots.";
+            }
+        }
+
+        fetchSlots();
+    </script>
+</body>
+</html>

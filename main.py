@@ -34,6 +34,10 @@ app.include_router(slots.router, prefix="/slots", tags=["Slots"])
 app.include_router(vehicles.router, prefix="/vehicles", tags=["Vehicles"])
 app.include_router(free_slot.router)
 
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
 # ✅ Serve index.html at home route
 from database import get_db_connection
 

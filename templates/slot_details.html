@@ -1,26 +1,29 @@
 <!-- templates/slot_details.html -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slot {{ slot_id }} Details</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
 
     <div class="container">
 
         <!-- ✅ Success Message -->
         <h2>✅ Registration Successful!</h2>
-        <p>Hello <strong>{{ user_name }}</strong>, your <strong>{{ vehicle_type }}</strong> has been successfully registered.</p>
-        <p>📱 A confirmation SMS has been sent to <strong>{{ phone_number }}</strong>.</p>
+        <p>Hello <strong>{{ user_name }}</strong>, your <strong>{{ vehicle_type }}</strong> has been successfully
+            registered.</p>
+        <p>📱 A confirmation message has been sent to <strong>{{ phone_number }}</strong> on Whatsapp.</p>
 
         <!-- 🅿️ Slot Details Section -->
         <h3>🚗 Parking Slot {{ slot_id }} Details</h3>
 
         <div class="slot-info">
-            <p><strong>Status:</strong> 
+            <p><strong>Status:</strong>
                 <span class="occupied">Occupied</span>
             </p>
 
@@ -28,11 +31,11 @@
         </div>
 
         <div class="actions">
-            <a href="/" class="back-link">⬅️ Back to Dashboard</a>
-            <a href="/slots/free/{{ vehicle_id }}" class="free-btn">🅿️ Free This Slot</a>
+            <a href="/dashboard" class="back-link">⬅️ Back to Dashboard</a>
+            <a href="/slots/free_by_user/{{ vehicle_id }}" class="free-btn">🅿️ Free This Slot</a>
         </div>
-
     </div>
 
 </body>
+
 </html>
