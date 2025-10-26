@@ -80,23 +80,16 @@ def register_vehicle(
 
         conn.commit()
 
-        # 6️⃣ Clean + format phone number for WhatsApp
-        clean_number = phone_number.strip()
-        if not clean_number.startswith("+"):
-            clean_number = "+91" + clean_number
-        # Twilio requires whatsapp: prefix
-        formatted_number = f"whatsapp:{clean_number}"
-
-        # 7️⃣ Send WhatsApp notification asynchronously
+        # 6️⃣ Send WhatsApp notification asynchronously
         background_tasks.add_task(
             send_whatsapp_notification,
-            to_number=formatted_number,
+            phone_number=phone_number,   # just pass the raw number
             slot_id=slot_id,
             vehicle_type=vehicle_type,
             vehicle_id=vehicle_id
         )
 
-        # 8️⃣ Show success + slot details
+        # 7️⃣ Show success + slot details
         return templates.TemplateResponse(
             "slot_details.html",
             {
