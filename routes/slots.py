@@ -200,69 +200,63 @@ def free_slot(slot_id: int, api_key: str = Header(None)):
 
 
 # ------------------ FREE SLOT BY USER ------------------
-@router.get("/free_by_user/{vehicle_id}", response_class=HTMLResponse)
-def free_slot_by_user(request: Request, vehicle_id: int):
+@router.get("/free_by_token/{token}", response_class=HTMLResponse)
+def free_by_token_confirm(request: Request, token: str):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     try:
-        # Fetch vehicle and slot info
         cursor.execute("""
-            SELECT parked_slot, entry_time, vehicle_type 
-            FROM vehicles 
-            WHERE vehicle_id = %s
-        """, (vehicle_id,))
-        vehicle = cursor.fetchone()
+            SELECT ft.vehicle_id, ft.slot_id, ft.expires_at, ft.used, v.vehicle_type, v.entry_time
+            FROM free_tokens ft
+            LEFT JOIN vehicles v ON ft.vehicle_id = v.vehicle_id
+            WHERE ft.token_uuid = %s;
+        """, (token,))
+        row = cursor.fetchone()
+        if not row:
+            return HTMLResponse("<h3>❌ Invalid or expired link.</h3>", status_code=404)
+        if row["used"]:
+            return HTMLResponse("<h3>⚠️ This link was already used.</h3>", status_code=410)
+        if row["expires_at"] and datetime.now() > row["expires_at"]:
+            return HTMLResponse("<h3>⏰ Link expired.</h3>", status_code=410)
 
-        if not vehicle or not vehicle["parked_slot"]:
-            return HTMLResponse("<h3>⚠️ No active parking found for this vehicle.</h3>")
+        # Do the free action (idempotent)
+        vehicle_id = row["vehicle_id"]
+        slot_id = row["slot_id"]
+        cursor.execute("UPDATE slots SET is_occupied=FALSE, vehicle_id=NULL WHERE slot_id=%s;", (slot_id,))
+        cursor.execute("UPDATE vehicles SET parked_slot=NULL, entry_time=NULL WHERE vehicle_id=%s;", (vehicle_id,))
+        cursor.execute("UPDATE free_tokens SET used=TRUE WHERE token_uuid=%s;", (token,))
+        conn.commit()
 
-        slot_id = vehicle["parked_slot"]
-        entry_time = vehicle["entry_time"]
+        entry_time = row.get("entry_time")
         exit_time = datetime.now()
 
-        # Calculate duration
-        duration_seconds = (exit_time - entry_time).total_seconds()
-        hours_parked = duration_seconds / 3600
-
-        # Convert to readable duration string
+        # Compute duration/amount (reuse your logic)
+        duration_seconds = (exit_time - entry_time).total_seconds() if entry_time else 0
         if duration_seconds < 60:
             duration_str = "Less than a minute"
         elif duration_seconds < 3600:
             minutes = int(duration_seconds // 60)
-            duration_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+            duration_str = f"{minutes} minute{'s' if minutes!=1 else ''}"
         else:
             hours = int(duration_seconds // 3600)
-            minutes = int((duration_seconds % 3600) // 60)
+            minutes = int((duration_seconds % 3600)//60)
             duration_str = f"{hours} hr {minutes} min"
 
-        # Rate calculation
-        rates = {"2-wheeler": 30, "4-wheeler": 50, "bicycle": 10}
-        rate = rates.get(vehicle["vehicle_type"], 10)
-
-        # Always charge for at least 15 minutes (0.25 hr)
-        billable_hours = max(hours_parked, 0.25)
+        rate_map = {"2-wheeler": 30, "4-wheeler": 50, "bicycle": 10}
+        rate = rate_map.get(row.get("vehicle_type"), 10)
+        billable_hours = max(duration_seconds/3600, 0.25)
         amount_due = round(billable_hours * rate, 2)
 
-        # Free the slot
-        cursor.execute("UPDATE slots SET is_occupied=FALSE, vehicle_id=NULL WHERE slot_id=%s", (slot_id,))
-        cursor.execute("UPDATE vehicles SET parked_slot=NULL, entry_time=NULL WHERE vehicle_id=%s", (vehicle_id,))
-        conn.commit()
-
-        # Send all data to template
-        return templates.TemplateResponse(
-            "free_slot.html",
-            {
-                "request": request,
-                "vehicle_type": vehicle["vehicle_type"],
-                "slot_id": slot_id,
-                "entry_time": entry_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "exit_time": exit_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "duration": duration_str,
-                "amount_due": amount_due
-            }
-        )
-
+        return templates.TemplateResponse("free_slot.html", {
+            "request": request,
+            "slot_id": slot_id,
+            "vehicle_type": row.get("vehicle_type"),
+            "entry_time": entry_time.strftime("%Y-%m-%d %H:%M:%S") if entry_time else "N/A",
+            "exit_time": exit_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "duration": duration_str,
+            "amount_due": amount_due
+        })
     finally:
         cursor.close()
         conn.close()
+
