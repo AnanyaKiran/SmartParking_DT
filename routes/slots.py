@@ -198,6 +198,44 @@ def free_slot(slot_id: int, api_key: str = Header(None)):
         cursor.close()
         conn.close()
 
+import uuid
+from datetime import timedelta
+
+# ------------------ GENERATE TOKEN AND RETURN LINK ------------------
+@router.get("/generate_free_link/{vehicle_id}")
+def generate_free_link(vehicle_id: int):
+    """Generate a one-time token-based free slot link for a vehicle."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Find slot assigned to the vehicle
+        cursor.execute("SELECT parked_slot FROM vehicles WHERE vehicle_id=%s;", (vehicle_id,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=404, detail="Vehicle not parked")
+
+        slot_id = row[0]
+        token_uuid = str(uuid.uuid4())
+        expires_at = datetime.now() + timedelta(hours=1)
+
+        cursor.execute("""
+            INSERT INTO free_tokens (token_uuid, vehicle_id, slot_id, expires_at)
+            VALUES (%s, %s, %s, %s);
+        """, (token_uuid, vehicle_id, slot_id, expires_at))
+        conn.commit()
+
+        return {
+            "free_link": f"{os.getenv('BASE_URL')}/slots/free_by_token/{token_uuid}",
+            "expires_at": expires_at.isoformat()
+        }
+
+    except Exception as e:
+        conn.rollback()
+        print("Error generating free link:", e)
+        raise HTTPException(status_code=500, detail="Failed to generate free link")
+    finally:
+        cursor.close()
+        conn.close()
 
 # ------------------ FREE SLOT BY USER ------------------
 @router.get("/free_by_token/{token}", response_class=HTMLResponse)
