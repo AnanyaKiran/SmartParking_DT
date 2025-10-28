@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from database import get_db_connection
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")

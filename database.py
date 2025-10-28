@@ -1,29 +1,46 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
+from psycopg2 import pool
 from dotenv import load_dotenv
+import atexit
 
 # Load environment variables
 load_dotenv()
 
-# ✅ Prefer DATABASE_URL if provided (Render usually gives this)
+# Prefer DATABASE_URL (Render usually provides this)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Otherwise, fall back to manual connection details
+# Fallbacks (for local dev)
 DB_NAME = os.getenv("POSTGRES_DB")
 DB_USER = os.getenv("POSTGRES_USER")
 DB_PASS = os.getenv("POSTGRES_PASSWORD")
 DB_HOST = os.getenv("POSTGRES_HOST")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
+# Global pool
+DB_POOL = None
 
-def get_db_connection():
+
+def init_db_pool(minconn=1, maxconn=10):
+    """
+    Initializes a connection pool (only once).
+    On Render, multiple workers may start at once — so keep pool small.
+    """
+    global DB_POOL
+    if DB_POOL:
+        return DB_POOL
+
     try:
         if DATABASE_URL:
-            # Render uses DATABASE_URL format
-            conn = psycopg2.connect(os.getenv("DATABASE_URL"), cursor_factory=RealDictCursor)
+            DB_POOL = pool.ThreadedConnectionPool(
+                minconn, maxconn,
+                DATABASE_URL,
+                cursor_factory=RealDictCursor
+            )
         else:
-            conn = psycopg2.connect(
+            DB_POOL = pool.ThreadedConnectionPool(
+                minconn, maxconn,
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASS,
@@ -31,10 +48,47 @@ def get_db_connection():
                 port=DB_PORT,
                 cursor_factory=RealDictCursor
             )
+        print("✅ Database connection pool initialized.")
+        return DB_POOL
+    except Exception as e:
+        print("❌ Database pool initialization failed:", e)
+        raise
+
+
+def get_db_connection():
+    """
+    Gets a connection from the pool. Initializes the pool if needed.
+    """
+    global DB_POOL
+    if DB_POOL is None:
+        init_db_pool()
+    try:
+        conn = DB_POOL.getconn()
         return conn
     except Exception as e:
-        print("❌ Database connection failed:", e)
+        print("❌ Failed to get DB connection from pool:", e)
         raise
+
+
+def release_db_connection(conn):
+    """
+    Returns a connection to the pool.
+    """
+    global DB_POOL
+    if DB_POOL and conn:
+        DB_POOL.putconn(conn)
+
+
+# Automatically close pool when app shuts down
+@atexit.register
+def close_db_pool():
+    global DB_POOL
+    if DB_POOL:
+        DB_POOL.closeall()
+        print("🧹 Database connection pool closed.")
+
+
+# --- Optional helper functions (your existing ones, using the pool safely) ---
 
 def get_all_slots():
     conn = get_db_connection()
@@ -44,7 +98,8 @@ def get_all_slots():
             slots = cursor.fetchall()
             return slots
     finally:
-        conn.close()
+        release_db_connection(conn)
+
 
 def get_slot_by_id(slot_id: int):
     conn = get_db_connection()
@@ -57,8 +112,7 @@ def get_slot_by_id(slot_id: int):
             slot = cursor.fetchone()
             return slot
     finally:
-        conn.close()
-
+        release_db_connection(conn)
 
 
 def free_slot(slot_id: int):
@@ -72,5 +126,4 @@ def free_slot(slot_id: int):
             conn.commit()
             return cursor.fetchone()
     finally:
-        conn.close()
-
+        release_db_connection(conn)

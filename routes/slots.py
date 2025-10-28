@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, Header
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from database import get_db_connection
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from notify_whatsapp import send_whatsapp_notification
 import os
 import psycopg2.extras
@@ -201,100 +201,88 @@ def free_slot(slot_id: int, api_key: str = Header(None)):
 import uuid
 from datetime import timedelta
 
-# ------------------ GENERATE TOKEN AND RETURN LINK ------------------
-@router.get("/generate_free_link/{vehicle_id}")
-def generate_free_link(vehicle_id: int):
-    """Generate a one-time token-based free slot link for a vehicle."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        # Find slot assigned to the vehicle
-        cursor.execute("SELECT parked_slot FROM vehicles WHERE vehicle_id=%s;", (vehicle_id,))
-        row = cursor.fetchone()
-        if not row or not row[0]:
-            raise HTTPException(status_code=404, detail="Vehicle not parked")
-
-        slot_id = row[0]
-        token_uuid = str(uuid.uuid4())
-        expires_at = datetime.now() + timedelta(hours=1)
-
-        cursor.execute("""
-            INSERT INTO free_tokens (token_uuid, vehicle_id, slot_id, expires_at)
-            VALUES (%s, %s, %s, %s);
-        """, (token_uuid, vehicle_id, slot_id, expires_at))
-        conn.commit()
-
-        return {
-            "free_link": f"{os.getenv('BASE_URL')}/slots/free_by_token/{token_uuid}",
-            "expires_at": expires_at.isoformat()
-        }
-
-    except Exception as e:
-        conn.rollback()
-        print("Error generating free link:", e)
-        raise HTTPException(status_code=500, detail="Failed to generate free link")
-    finally:
-        cursor.close()
-        conn.close()
 
 # ------------------ FREE SLOT BY USER ------------------
 @router.get("/free_by_token/{token}", response_class=HTMLResponse)
 def free_by_token_confirm(request: Request, token: str):
+    from datetime import datetime, timezone
+
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cursor.execute("""
-            SELECT ft.vehicle_id, ft.slot_id, ft.expires_at, ft.used, v.vehicle_type, v.entry_time
-            FROM free_tokens ft
-            LEFT JOIN vehicles v ON ft.vehicle_id = v.vehicle_id
-            WHERE ft.token_uuid = %s;
-        """, (token,))
-        row = cursor.fetchone()
-        if not row:
-            return HTMLResponse("<h3>❌ Invalid or expired link.</h3>", status_code=404)
-        if row["used"]:
-            return HTMLResponse("<h3>⚠️ This link was already used.</h3>", status_code=410)
-        if row["expires_at"] and datetime.now() > row["expires_at"]:
-            return HTMLResponse("<h3>⏰ Link expired.</h3>", status_code=410)
+        with conn:  # ensures transaction commit/rollback automatically
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                # Lock the token row so no race condition occurs
+                cursor.execute("""
+                    SELECT ft.vehicle_id, ft.slot_id, ft.expires_at, ft.used, 
+                           v.vehicle_type, v.entry_time
+                    FROM free_tokens ft
+                    LEFT JOIN vehicles v ON ft.vehicle_id = v.vehicle_id
+                    WHERE ft.token_uuid = %s
+                    FOR UPDATE;
+                """, (token,))
+                row = cursor.fetchone()
 
-        # Do the free action (idempotent)
-        vehicle_id = row["vehicle_id"]
-        slot_id = row["slot_id"]
-        cursor.execute("UPDATE slots SET is_occupied=FALSE, vehicle_id=NULL WHERE slot_id=%s;", (slot_id,))
-        cursor.execute("UPDATE vehicles SET parked_slot=NULL, entry_time=NULL WHERE vehicle_id=%s;", (vehicle_id,))
-        cursor.execute("UPDATE free_tokens SET used=TRUE WHERE token_uuid=%s;", (token,))
-        conn.commit()
+                if not row:
+                    print("❌ Token not found in DB:", token)
+                    return HTMLResponse("<h3>❌ Invalid or expired link. Please try registering again.</h3>", status_code=404)
 
-        entry_time = row.get("entry_time")
-        exit_time = datetime.now()
 
-        # Compute duration/amount (reuse your logic)
-        duration_seconds = (exit_time - entry_time).total_seconds() if entry_time else 0
-        if duration_seconds < 60:
-            duration_str = "Less than a minute"
-        elif duration_seconds < 3600:
-            minutes = int(duration_seconds // 60)
-            duration_str = f"{minutes} minute{'s' if minutes!=1 else ''}"
-        else:
-            hours = int(duration_seconds // 3600)
-            minutes = int((duration_seconds % 3600)//60)
-            duration_str = f"{hours} hr {minutes} min"
+                # timezone-safe "now"
+                now = datetime.now(timezone.utc)
 
-        rate_map = {"2-wheeler": 30, "4-wheeler": 50, "bicycle": 10}
-        rate = rate_map.get(row.get("vehicle_type"), 10)
-        billable_hours = max(duration_seconds/3600, 0.25)
-        amount_due = round(billable_hours * rate, 2)
+                # ensure expires_at is timezone-aware
+                expires_at = row["expires_at"]
+                if expires_at and expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
 
-        return templates.TemplateResponse("free_slot.html", {
-            "request": request,
-            "slot_id": slot_id,
-            "vehicle_type": row.get("vehicle_type"),
-            "entry_time": entry_time.strftime("%Y-%m-%d %H:%M:%S") if entry_time else "N/A",
-            "exit_time": exit_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "duration": duration_str,
-            "amount_due": amount_due
-        })
+                if row["used"]:
+                    return HTMLResponse("<h3>⚠️ This link has already been used.</h3>", status_code=410)
+                if expires_at and now > expires_at:
+                    return HTMLResponse("<h3>⏰ Link expired.</h3>", status_code=410)
+
+                vehicle_id = row["vehicle_id"]
+                slot_id = row["slot_id"]
+
+                # Free the slot and mark token as used atomically
+                cursor.execute("UPDATE slots SET is_occupied=FALSE, vehicle_id=NULL WHERE slot_id=%s;", (slot_id,))
+                cursor.execute("UPDATE vehicles SET parked_slot=NULL, entry_time=NULL WHERE vehicle_id=%s;", (vehicle_id,))
+                cursor.execute("UPDATE free_tokens SET used=TRUE WHERE token_uuid=%s;", (token,))
+
+                # get entry_time safely
+                entry_time = row.get("entry_time")
+                if entry_time and entry_time.tzinfo is None:
+                    entry_time = entry_time.replace(tzinfo=timezone.utc)
+
+                exit_time = now
+
+                # Compute duration
+                duration_seconds = (exit_time - entry_time).total_seconds() if entry_time else 0
+                if duration_seconds < 60:
+                    duration_str = "Less than a minute"
+                elif duration_seconds < 3600:
+                    minutes = int(duration_seconds // 60)
+                    duration_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+                else:
+                    hours = int(duration_seconds // 3600)
+                    minutes = int((duration_seconds % 3600) // 60)
+                    duration_str = f"{hours} hr {minutes} min"
+
+                rate_map = {"2-wheeler": 30, "4-wheeler": 50, "bicycle": 10}
+                rate = rate_map.get(row.get("vehicle_type"), 10)
+                billable_hours = max(duration_seconds / 3600, 0.25)
+                amount_due = round(billable_hours * rate, 2)
+
+                # TemplateResponse after successful commit
+                return templates.TemplateResponse("free_slot.html", {
+                    "request": request,
+                    "slot_id": slot_id,
+                    "vehicle_type": row.get("vehicle_type"),
+                    "entry_time": entry_time.strftime("%Y-%m-%d %H:%M:%S") if entry_time else "N/A",
+                    "exit_time": exit_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "duration": duration_str,
+                    "amount_due": amount_due
+                })
     finally:
-        cursor.close()
         conn.close()
+
 
