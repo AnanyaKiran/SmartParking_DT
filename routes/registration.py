@@ -3,8 +3,9 @@ from fastapi import APIRouter, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from database import get_db_connection
+import os
 from notify_whatsapp import send_whatsapp_notification
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 router = APIRouter()
@@ -18,6 +19,7 @@ def show_register_form(request: Request):
 
 
 @router.post("/", response_class=HTMLResponse)
+@router.post("/", response_class=HTMLResponse)
 def register_vehicle(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -26,7 +28,6 @@ def register_vehicle(
     license_plate: str = Form(...),
     vehicle_type: str = Form(...)
 ):
-    """Register a new vehicle, assign a free slot, and send WhatsApp notification."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -53,7 +54,7 @@ def register_vehicle(
         user_id = user_row["user_id"] if isinstance(user_row, dict) else user_row[0]
 
         # 3️⃣ Insert vehicle record
-        entry_time = datetime.now()
+        entry_time = datetime.now(timezone.utc)
         cursor.execute("""
             INSERT INTO vehicles (
                 license_plate, user_id, parked_slot, vehicle_type, phone_number, entry_time
@@ -72,24 +73,31 @@ def register_vehicle(
 
         # 5️⃣ Create free-token (for exit link)
         token_uuid = str(uuid.uuid4())
-        expires_at = datetime.now() + timedelta(hours=2)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
         cursor.execute("""
-            INSERT INTO free_tokens (token_uuid, vehicle_id, slot_id, expires_at)
-            VALUES (%s, %s, %s, %s);
+            INSERT INTO free_tokens (token_uuid, vehicle_id, slot_id, expires_at, used)
+            VALUES (%s, %s, %s, %s, FALSE);
         """, (token_uuid, vehicle_id, slot_id, expires_at))
 
+        # ✅ Build the WhatsApp free-slot link
+        BASE_URL = os.getenv("BASE_URL", "https://your-app.onrender.com")
+        slot_link = f"{BASE_URL}/free_by_token/{token_uuid}"
+
+        # Commit DB changes
         conn.commit()
 
         # 6️⃣ Send WhatsApp notification asynchronously
         background_tasks.add_task(
             send_whatsapp_notification,
-            phone_number=phone_number,   # just pass the raw number
+            phone_number=phone_number,
             slot_id=slot_id,
             vehicle_type=vehicle_type,
-            vehicle_id=vehicle_id
+            vehicle_id=vehicle_id,
+            token_uuid=token_uuid,
         )
 
-        # 7️⃣ Show success + slot details
+        # 7️⃣ Show success page
         return templates.TemplateResponse(
             "slot_details.html",
             {
@@ -98,8 +106,8 @@ def register_vehicle(
                 "slot_id": slot_id,
                 "phone_number": phone_number,
                 "vehicle_type": vehicle_type,
-                "vehicle_id": vehicle_id
-            }
+                "vehicle_id": vehicle_id,
+            },
         )
 
     except Exception as e:
@@ -109,3 +117,4 @@ def register_vehicle(
     finally:
         cursor.close()
         conn.close()
+
